@@ -1,0 +1,183 @@
+# -----------------------------
+# Global OS
+# -----------------------------
+# macOS
+.DS_Store
+.AppleDouble
+._*
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# -----------------------------
+# Editor/IDE
+# -----------------------------
+# VSCode
+.vscode/
+
+# JetBrains IDEs (PyCharm, IntelliJ, WebStorm, etc.)
+.idea/
+
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# Vim swap files
+*.swp
+*.swo
+
+# Emacs
+*~
+.#*
+
+# -----------------------------
+# Language / Runtime
+# -----------------------------
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Build outputs
+dist/
+build/
+out/
+/.next/
+.nuxt/
+
+# Temporary
+.parcel-cache/
+.cache/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+env/
+venv/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# pytest
+.pytest_cache/
+
+# Python packaging
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+*.egg-info
+installed.cfg
+lib64
+
+# -----------------------------
+# Containers, virtualization
+# -----------------------------
+.vagrant/
+Vagrantfile.local
+
+# Docker
+docker-compose.override.yml
+docker-compose.*.yml
+**/docker-compose.override.yml
+**/docker-compose.*.yml
+**/Dockerfile.build
+*.dockerfile
+
+# -----------------------------
+# Secrets and config
+# -----------------------------
+# Environment variables
+.env
+.env.*
+env.local
+local.env
+
+# Secret keys and credentials
+*.pem
+*.key
+*.crt
+
+# -----------------------------
+# Logs and databases
+# -----------------------------
+*.log
+logs/
+*.sql
+*.sqlite
+*.sqlite3
+*.db
+
+# -----------------------------
+# CI/CD
+# -----------------------------
+# GitHub action artifacts
+.github/workflows/*_cache
+
+# Coverage
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# -----------------------------
+# Misc common files
+# -----------------------------
+Thumbs.db
+ehthumbs.db
+Icon?
+desktop.ini
+*.DS_Store
+
+# Lock files sometimes you want to keep them - remove if you intentionally track lockfiles
+# Uncomment the next line if you DO NOT want to track lockfiles (npm/yarn/pnpm)
+# package-lock.json
+
+# -----------------------------
+# Local project-specific
+# -----------------------------
+# Add local files below this line
+
+# -----------------------------
+# Django
+# -----------------------------
+# SQLite DB (common default for development)
+db.sqlite3
+*.sqlite3
+
+# Django media files (user uploaded content)
+media/
+uploads/
+
+# Collected static files (do NOT ignore if you track source static/)
+staticfiles/
+static/
+
+# Local settings (often contain secrets)
+local_settings.py
+
+# Django migration pycache and compiled files
+**/migrations/__pycache__/
+**/migrations/*.py[cod]
+
+# Celery beat schedule file
+celerybeat-schedule
+
+# Django compressed assets or caches
+django-debug.log
+
