@@ -27,11 +27,6 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             'email',
             'password',
             'password2',
-            'nombre_fantasia',
-            'genero',
-            'edad',
-            'telefono',
-            'ciudad',
         ]
         extra_kwargs = {
             'email': {'required': True},
@@ -59,11 +54,6 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             username=validated_data['username'],
             email=validated_data['email'],
             password=validated_data['password'],
-            nombre_fantasia=validated_data.get('nombre_fantasia', ''),
-            genero=validated_data.get('genero', ''),
-            edad=validated_data.get('edad'),
-            telefono=validated_data.get('telefono', ''),
-            ciudad=validated_data.get('ciudad', ''),
         )
         
         return user
@@ -79,26 +69,9 @@ class UserSerializer(serializers.ModelSerializer):
             'id',
             'username',
             'email',
-            'nombre_fantasia',
-            'genero',
-            'edad',
-            'medidas',
-            'peso',
-            'altura',
-            'ciudad',
-            'telefono',
-            'biografia',
             'esta_verificada',
-            'email_verified',
-            'phone_verified',
-            'identity_verified',
-            'verification_status',
         ]
         read_only_fields = [
             'id',
             'esta_verificada',
-            'email_verified',
-            'phone_verified',
-            'identity_verified',
-            'verification_status',
         ]

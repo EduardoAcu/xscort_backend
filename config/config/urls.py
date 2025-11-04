@@ -21,7 +21,6 @@ from django.conf import settings
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('usuarios.urls')),
-    path('api/', include('perfiles.urls')),  # <-- usar 'perfiles.urls' si corresponde
 ]
 
 if settings.DEBUG:
