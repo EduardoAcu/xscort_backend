@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import PerfilModelo, Servicio, GaleriaFoto, Tag
+from reviews.models import Resena
 
 
 class TagSerializer(serializers.ModelSerializer):
@@ -20,10 +21,19 @@ class GaleriaFotoSerializer(serializers.ModelSerializer):
         fields = ['id', 'perfil_modelo', 'imagen']
 
 
+class ResenaAprobadaSerializer(serializers.ModelSerializer):
+    cliente_username = serializers.CharField(source='cliente.username', read_only=True)
+    
+    class Meta:
+        model = Resena
+        fields = ['id', 'cliente_username', 'rating', 'comentario', 'fecha_creacion']
+
+
 class PerfilModeloSerializer(serializers.ModelSerializer):
     tags = TagSerializer(many=True, read_only=True)
     servicios = ServicioSerializer(many=True, read_only=True)
     galeria_fotos = GaleriaFotoSerializer(many=True, read_only=True)
+    resenas = serializers.SerializerMethodField()
     
     class Meta:
         model = PerfilModelo
@@ -44,7 +54,12 @@ class PerfilModeloSerializer(serializers.ModelSerializer):
             'tags',
             'servicios',
             'galeria_fotos',
+            'resenas',
         ]
         extra_kwargs = {
             'ciudad': {'required': True},
         }
+    
+    def get_resenas(self, obj):
+        resenas_aprobadas = obj.resenas.filter(aprobada=True)
+        return ResenaAprobadaSerializer(resenas_aprobadas, many=True).data
