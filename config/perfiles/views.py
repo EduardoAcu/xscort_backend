@@ -4,8 +4,8 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
 from django.db.models import Q
-from .models import PerfilModelo
-from .serializers import PerfilModeloSerializer
+from .models import PerfilModelo, SolicitudCambioCiudad
+from .serializers import PerfilModeloSerializer, SolicitudCambioCiudadSerializer
 
 
 class PerfilesPagination(PageNumberPagination):
@@ -92,6 +92,49 @@ def crear_perfil(request):
     Crear perfil de modelo. El campo ciudad es requerido.
     """
     serializer = PerfilModeloSerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def solicitar_cambio_ciudad(request):
+    """
+    Endpoint para que una modelo cree una solicitud de cambio de ciudad.
+    Requiere autenticación y que el usuario tenga un perfil de modelo.
+    
+    Body esperado:
+    {
+        "ciudad_nueva": "Concepcion"
+    }
+    """
+    try:
+        perfil = request.user.perfil_modelo
+    except PerfilModelo.DoesNotExist:
+        return Response(
+            {"error": "No tienes un perfil de modelo asociado"},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    # Verificar si ya existe una solicitud pendiente
+    solicitud_pendiente = SolicitudCambioCiudad.objects.filter(
+        perfil=perfil,
+        estado='pendiente'
+    ).exists()
+    
+    if solicitud_pendiente:
+        return Response(
+            {"error": "Ya tienes una solicitud de cambio de ciudad pendiente"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Crear la solicitud
+    data = request.data.copy()
+    data['perfil'] = perfil.id
+    
+    serializer = SolicitudCambioCiudadSerializer(data=data)
     if serializer.is_valid():
         serializer.save()
         return Response(serializer.data, status=status.HTTP_201_CREATED)

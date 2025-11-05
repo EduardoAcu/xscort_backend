@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import PerfilModelo, Servicio, GaleriaFoto, Tag
+from .models import PerfilModelo, Servicio, GaleriaFoto, Tag, SolicitudCambioCiudad
 from reviews.models import Resena
 
 
@@ -63,3 +63,12 @@ class PerfilModeloSerializer(serializers.ModelSerializer):
     def get_resenas(self, obj):
         resenas_aprobadas = obj.resenas.filter(aprobada=True)
         return ResenaAprobadaSerializer(resenas_aprobadas, many=True).data
+
+
+class SolicitudCambioCiudadSerializer(serializers.ModelSerializer):
+    perfil_nombre = serializers.CharField(source='perfil.nombre_artistico', read_only=True)
+    
+    class Meta:
+        model = SolicitudCambioCiudad
+        fields = ['id', 'perfil', 'perfil_nombre', 'ciudad_nueva', 'estado', 'fecha_solicitud']
+        read_only_fields = ['estado', 'fecha_solicitud']
