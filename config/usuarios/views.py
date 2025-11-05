@@ -1,10 +1,10 @@
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
-from .serializers import UserRegistrationSerializer, UserSerializer
+from .serializers import UserRegistrationSerializer, UserSerializer, VerificationDocumentsSerializer
 
 
 class UserRegistrationView(APIView):
@@ -70,3 +70,59 @@ class UserLoginView(APIView):
         return Response({
             'error': 'Credenciales inválidas'
         }, status=status.HTTP_401_UNAUTHORIZED)
+
+
+class UploadVerificationDocumentsView(APIView):
+    """
+    Vista para subir documentos de verificación.
+    Endpoint: POST /api/verification/upload-documents/
+    
+    Requiere autenticación.
+    Body esperado (multipart/form-data):
+    - foto_documento: archivo de imagen (opcional si se envía selfie_con_documento)
+    - selfie_con_documento: archivo de imagen (opcional si se envía foto_documento)
+    
+    Al menos uno de los dos campos debe estar presente.
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        user = request.user
+        
+        # Check if user is a modelo
+        if not user.es_modelo:
+            return Response(
+                {"error": "Solo los usuarios modelo pueden subir documentos de verificación"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Check if already verified
+        if user.esta_verificada:
+            return Response(
+                {"error": "Tu cuenta ya está verificada"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Prepare data with files
+        data = {}
+        if 'foto_documento' in request.FILES:
+            data['foto_documento'] = request.FILES['foto_documento']
+        if 'selfie_con_documento' in request.FILES:
+            data['selfie_con_documento'] = request.FILES['selfie_con_documento']
+        
+        serializer = VerificationDocumentsSerializer(user, data=data, partial=True)
+        
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {
+                    "message": "Documentos subidos exitosamente. Tu cuenta será revisada por un administrador.",
+                    "data": {
+                        "foto_documento": serializer.data.get('foto_documento'),
+                        "selfie_con_documento": serializer.data.get('selfie_con_documento'),
+                    }
+                },
+                status=status.HTTP_200_OK
+            )
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

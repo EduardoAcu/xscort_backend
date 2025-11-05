@@ -72,3 +72,26 @@ class SolicitudCambioCiudadSerializer(serializers.ModelSerializer):
         model = SolicitudCambioCiudad
         fields = ['id', 'perfil', 'perfil_nombre', 'ciudad_nueva', 'estado', 'fecha_solicitud']
         read_only_fields = ['estado', 'fecha_solicitud']
+
+
+class PerfilModeloUpdateSerializer(serializers.ModelSerializer):
+    """
+    Serializer for updating PerfilModelo. 
+    Excludes ciudad field - city changes must go through SolicitudCambioCiudad.
+    """
+    class Meta:
+        model = PerfilModelo
+        fields = [
+            'foto_perfil',
+            'nombre_artistico',
+            'biografia',
+            'telefono_contacto',
+            'telegram_contacto',
+            'edad',
+            'genero',
+            'peso',
+            'altura',
+            'medidas',
+            'nacionalidad',
+        ]
+        # Ciudad is intentionally excluded - it can only be changed via SolicitudCambioCiudad

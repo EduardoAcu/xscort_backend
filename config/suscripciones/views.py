@@ -55,3 +55,99 @@ def crear_renovar_suscripcion(request):
         "mensaje": mensaje,
         "suscripcion": serializer.data
     }, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def pausar_suscripcion(request):
+    """
+    Endpoint para que una modelo pause su suscripción.
+    Pone esta_pausada = True.
+    
+    Mientras esté pausada, el perfil no será visible públicamente.
+    """
+    user = request.user
+    
+    try:
+        suscripcion = Suscripcion.objects.get(user=user)
+    except Suscripcion.DoesNotExist:
+        return Response(
+            {"error": "No tienes una suscripción activa"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    
+    # Check if already paused
+    if suscripcion.esta_pausada:
+        return Response(
+            {"error": "Tu suscripción ya está pausada"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Check if there are remaining days
+    if suscripcion.dias_restantes <= 0:
+        return Response(
+            {"error": "No puedes pausar una suscripción sin días restantes"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Pause subscription
+    suscripcion.esta_pausada = True
+    suscripcion.save()
+    
+    serializer = SuscripcionSerializer(suscripcion)
+    
+    return Response(
+        {
+            "mensaje": "Suscripción pausada exitosamente. Tu perfil no será visible hasta que la reactives.",
+            "suscripcion": serializer.data
+        },
+        status=status.HTTP_200_OK
+    )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def resumir_suscripcion(request):
+    """
+    Endpoint para que una modelo reanude/reactive su suscripción.
+    Pone esta_pausada = False.
+    
+    Después de reanudar, el perfil volverá a ser visible públicamente.
+    """
+    user = request.user
+    
+    try:
+        suscripcion = Suscripcion.objects.get(user=user)
+    except Suscripcion.DoesNotExist:
+        return Response(
+            {"error": "No tienes una suscripción activa"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    
+    # Check if already active (not paused)
+    if not suscripcion.esta_pausada:
+        return Response(
+            {"error": "Tu suscripción ya está activa"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Check if there are remaining days
+    if suscripcion.dias_restantes <= 0:
+        return Response(
+            {"error": "No puedes reanudar una suscripción sin días restantes. Por favor, renueva tu plan."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Resume subscription
+    suscripcion.esta_pausada = False
+    suscripcion.save()
+    
+    serializer = SuscripcionSerializer(suscripcion)
+    
+    return Response(
+        {
+            "mensaje": "Suscripción reactivada exitosamente. Tu perfil volverá a ser visible.",
+            "suscripcion": serializer.data
+        },
+        status=status.HTTP_200_OK
+    )

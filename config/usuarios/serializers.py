@@ -75,3 +75,25 @@ class UserSerializer(serializers.ModelSerializer):
             'id',
             'esta_verificada',
         ]
+
+
+class VerificationDocumentsSerializer(serializers.ModelSerializer):
+    """
+    Serializer para subir documentos de verificación.
+    """
+    class Meta:
+        model = CustomUser
+        fields = [
+            'foto_documento',
+            'selfie_con_documento',
+        ]
+    
+    def validate(self, attrs):
+        """
+        Validar que al menos uno de los documentos esté presente.
+        """
+        if not attrs.get('foto_documento') and not attrs.get('selfie_con_documento'):
+            raise serializers.ValidationError(
+                "Debes subir al menos un documento (foto_documento o selfie_con_documento)"
+            )
+        return attrs
