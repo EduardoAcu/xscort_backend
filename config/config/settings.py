@@ -43,8 +43,10 @@ INSTALLED_APPS = [
     'corsheaders',
     'debug_toolbar',
     'django_filters',
+    'django_crontab',
     'usuarios',
     'perfiles',
+    'suscripciones',
 ]
 
 MIDDLEWARE = [
@@ -190,6 +192,11 @@ if DEBUG:
     INTERNAL_IPS = [
         '127.0.0.1',
     ]
+
+# django-crontab configuration
+CRONJOBS = [
+    ('0 0 * * *', 'django.core.management.call_command', ['decrementar_dias_suscripcion']),
+]
 
 # Importar configuraciones de apps externas
 from .jazzmin_config import *
