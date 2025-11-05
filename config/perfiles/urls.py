@@ -1,0 +1,9 @@
+from django.urls import path
+from . import views
+
+app_name = 'perfiles'
+
+urlpatterns = [
+    path('<int:id>/', views.ver_perfil, name='ver_perfil'),
+    path('create/', views.crear_perfil, name='crear_perfil'),
+]

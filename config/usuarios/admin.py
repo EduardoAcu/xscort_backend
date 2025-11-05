@@ -22,7 +22,7 @@ class CustomUserAdmin(UserAdmin):
     fieldsets = UserAdmin.fieldsets + (
         ('Información adicional', {
             'fields': (
-                'es_modelo', 'telefono_personal', 'edad',
+                'es_modelo', 'telefono_personal',
                 'foto_documento', 'selfie_con_documento', 'esta_verificada'
             )
         }),
