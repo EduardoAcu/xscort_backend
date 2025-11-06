@@ -217,10 +217,10 @@ EMAIL_PORT = env.int('EMAIL_PORT', default=587)
 EMAIL_USE_TLS = env.bool('EMAIL_USE_TLS', default=True)
 EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
-DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='noreply@xscort.com')
+DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='noreply@xscort.cl')
 
 # Admin email for notifications
-ADMIN_EMAIL = env('ADMIN_EMAIL', default='admin@xscort.com')
+ADMIN_EMAIL = env('ADMIN_EMAIL', default='soporte@xscort.cl')
 
 # Importar configuraciones de apps externas
 from .jazzmin_config import *
