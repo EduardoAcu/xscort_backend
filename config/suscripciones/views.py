@@ -151,3 +151,21 @@ def resumir_suscripcion(request):
         },
         status=status.HTTP_200_OK
     )
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def obtener_suscripcion(request):
+    """
+    Endpoint para obtener la suscripción del usuario autenticado.
+    """
+    user = request.user
+    
+    try:
+        suscripcion = Suscripcion.objects.get(user=user)
+        serializer = SuscripcionSerializer(suscripcion)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    except Suscripcion.DoesNotExist:
+        return Response(
+            {"error": "No tienes una suscripción activa"},
+            status=status.HTTP_404_NOT_FOUND
+        )
