@@ -328,9 +328,10 @@ def crear_servicio(request):
     
     Body esperado:
     {
-        "nombre": "Masaje relajante",
-        "precio": "50000"
+        "nombre": "Servicio VIP"
     }
+    
+    Nota: Los servicios solo incluyen nombres, no precios.
     """
     try:
         perfil = request.user.perfil_modelo
@@ -359,9 +360,10 @@ def actualizar_servicio(request, servicio_id):
     
     Body esperado:
     {
-        "nombre": "Masaje relajante actualizado",
-        "precio": "60000"
+        "nombre": "Servicio VIP Actualizado"
     }
+    
+    Nota: Los servicios solo incluyen nombres, no precios.
     """
     try:
         perfil = request.user.perfil_modelo

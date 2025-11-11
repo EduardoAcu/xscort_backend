@@ -10,7 +10,7 @@ class PerfilModeloAdmin(admin.ModelAdmin):
 
 @admin.register(Servicio)
 class ServicioAdmin(admin.ModelAdmin):
-    list_display = ['nombre', 'precio', 'perfil_modelo']
+    list_display = ['nombre', 'perfil_modelo']
     list_filter = ['perfil_modelo']
     search_fields = ['nombre']
 

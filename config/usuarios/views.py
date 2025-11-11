@@ -77,7 +77,7 @@ class UploadVerificationDocumentsView(APIView):
     Vista para subir documentos de verificación.
     Endpoint: POST /api/verification/upload-documents/
     
-    Requiere autenticación.
+    Requiere autenticación y que el usuario haya solicitado ser modelo.
     Body esperado (multipart/form-data):
     - foto_documento: archivo de imagen (opcional si se envía selfie_con_documento)
     - selfie_con_documento: archivo de imagen (opcional si se envía foto_documento)
@@ -89,11 +89,11 @@ class UploadVerificationDocumentsView(APIView):
     def post(self, request):
         user = request.user
         
-        # Check if user is a modelo
-        if not user.es_modelo:
+        # Check if user has requested to be a model
+        if not user.ha_solicitado_ser_modelo:
             return Response(
-                {"error": "Solo los usuarios modelo pueden subir documentos de verificación"},
-                status=status.HTTP_403_FORBIDDEN
+                {"error": "Primero debes solicitar ser modelo. Usa el endpoint /api/request-model-verification/"},
+                status=status.HTTP_400_BAD_REQUEST
             )
         
         # Check if already verified
@@ -126,3 +126,48 @@ class UploadVerificationDocumentsView(APIView):
             )
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class RequestModelVerificationView(APIView):
+    """
+    Solicita verificación para ser modelo.
+    Endpoint: POST /api/request-model-verification/
+    
+    Este endpoint marca al usuario como solicitante de modelo,
+    permitiendo subir documentos de verificación.
+    El usuario NO será modelo hasta que un admin apruebe los documentos.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        
+        # Verificar si ya es modelo verificado
+        if user.es_modelo and user.esta_verificada:
+            return Response(
+                {"message": "Ya eres un modelo verificado"},
+                status=status.HTTP_200_OK
+            )
+        
+        # Verificar si ya solicitó
+        if user.ha_solicitado_ser_modelo:
+            return Response(
+                {
+                    "message": "Ya has solicitado ser modelo. Ahora puedes subir tus documentos de verificación.",
+                    "next_step": "POST /api/verification/upload-documents/"
+                },
+                status=status.HTTP_200_OK
+            )
+        
+        # Marcar como solicitante
+        user.ha_solicitado_ser_modelo = True
+        user.save()
+        
+        return Response(
+            {
+                "message": "Solicitud registrada. Ahora debes subir tus documentos de verificación.",
+                "next_step": "POST /api/verification/upload-documents/",
+                "required_documents": ["foto_documento", "selfie_con_documento"]
+            },
+            status=status.HTTP_200_OK
+        )

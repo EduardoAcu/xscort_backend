@@ -5,6 +5,7 @@ app_name = 'suscripciones'
 
 urlpatterns = [
     path('', views.obtener_suscripcion, name='obtener_suscripcion'),
+    path('mi-suscripcion/', views.obtener_suscripcion, name='mi_suscripcion'),  # alias
     path('planes/', views.listar_planes, name='listar_planes'),
     path('suscribir/', views.crear_renovar_suscripcion, name='crear_renovar_suscripcion'),
     path('pausar/', views.pausar_suscripcion, name='pausar_suscripcion'),

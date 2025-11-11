@@ -12,7 +12,7 @@ class TagSerializer(serializers.ModelSerializer):
 class ServicioSerializer(serializers.ModelSerializer):
     class Meta:
         model = Servicio
-        fields = ['id', 'perfil_modelo', 'nombre', 'precio']
+        fields = ['id', 'perfil_modelo', 'nombre']
 
 
 class GaleriaFotoSerializer(serializers.ModelSerializer):

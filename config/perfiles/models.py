@@ -55,10 +55,9 @@ def crear_perfil_modelo(sender, instance, created, **kwargs):
 class Servicio(models.Model):
     perfil_modelo = models.ForeignKey(PerfilModelo, on_delete=models.CASCADE, related_name='servicios')
     nombre = models.CharField(max_length=100)
-    precio = models.DecimalField(max_digits=10, decimal_places=2)
 
     def __str__(self):
-        return f"{self.nombre} - {self.precio}"
+        return self.nombre
 
 class GaleriaFoto(models.Model):
     perfil_modelo = models.ForeignKey(PerfilModelo, on_delete=models.CASCADE, related_name='galeria_fotos')
