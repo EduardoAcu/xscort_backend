@@ -6,9 +6,22 @@ from rest_framework.pagination import PageNumberPagination
 from django.db.models import Q
 from django.core.mail import send_mail
 from django.conf import settings
-from .models import PerfilModelo, SolicitudCambioCiudad, Servicio, GaleriaFoto, Tag
-from .serializers import PerfilModeloSerializer, SolicitudCambioCiudadSerializer, PerfilModeloUpdateSerializer, ServicioSerializer, GaleriaFotoSerializer, TagSerializer
-from .permissions import IsProfileOwner
+from django.views.decorators.cache import cache_page
+from .models import PerfilModelo, SolicitudCambioCiudad, Servicio, GaleriaFoto, Tag, Ciudad, PerfilLike, ServicioCatalogo
+from .serializers import PerfilModeloSerializer, SolicitudCambioCiudadSerializer, PerfilModeloUpdateSerializer, ServicioSerializer, GaleriaFotoSerializer, TagSerializer, CiudadSerializer, ServicioCatalogoSerializer
+from .permissions import IsProfileOwner, IsModeloUser
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def listar_ciudades(request):
+    """
+    Devuelve las ciudades permitidas según choices de PerfilModelo.
+    """
+    ciudades = Ciudad.objects.filter(activa=True).order_by('ordering', 'nombre')
+    serializer = CiudadSerializer(ciudades, many=True)
+    # Front espera value/label; mantenemos compatibilidad
+    data = [{"value": c['id'], "label": c['nombre']} for c in serializer.data]
+    return Response(data, status=status.HTTP_200_OK)
 
 
 class PerfilesPagination(PageNumberPagination):
@@ -19,6 +32,7 @@ class PerfilesPagination(PageNumberPagination):
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
+@cache_page(60)  # cachea 60 segundos las listas públicas de perfiles
 def listar_perfiles(request):
     """
     Endpoint público para listar todos los perfiles de modelos.
@@ -34,39 +48,57 @@ def listar_perfiles(request):
     
     Paginación: 10 perfiles por página (configurable con ?page_size=N)
     """
-    perfiles = PerfilModelo.objects.filter(
-        user__esta_verificada=True,
-        user__suscripcion__dias_restantes__gt=0,
-        user__suscripcion__esta_pausada=False
+    perfiles_qs = (
+        PerfilModelo.objects.filter(
+            user__esta_verificada=True,
+            user__suscripcion__dias_restantes__gt=0,
+            user__suscripcion__esta_pausada=False,
+        )
+        .select_related('user', 'user__suscripcion')
+        .prefetch_related(
+            'tags',
+            'servicios',
+            'galeria_fotos',
+            'resenas',
+            'resenas__cliente',
+        )
     )
     
-    # Filtro por ciudad
+    # Filtro por ciudad (acepta id o nombre para compatibilidad)
     ciudad = request.query_params.get('ciudad', None)
     if ciudad:
-        perfiles = perfiles.filter(ciudad=ciudad)
+        if ciudad.isdigit():
+            perfiles_qs = perfiles_qs.filter(ciudad__id=int(ciudad))
+        else:
+            perfiles_qs = perfiles_qs.filter(ciudad__nombre__iexact=ciudad)
     
     # Filtro por tags (separados por coma)
     tags = request.query_params.get('tags', None)
     if tags:
         tag_list = [tag.strip() for tag in tags.split(',')]
-        perfiles = perfiles.filter(tags__nombre__in=tag_list).distinct()
+        perfiles_qs = perfiles_qs.filter(tags__nombre__in=tag_list).distinct()
+    # Filtro por servicio (nombre contiene)
+    servicio = request.query_params.get('servicio', None)
+    if servicio:
+        perfiles_qs = perfiles_qs.filter(servicios__nombre__icontains=servicio).distinct()
     
     # Búsqueda por texto en nombre_artistico y biografia
     search = request.query_params.get('search', None)
     if search:
-        perfiles = perfiles.filter(
+        perfiles_qs = perfiles_qs.filter(
             Q(nombre_artistico__icontains=search) |
             Q(biografia__icontains=search)
         )
     
     paginator = PerfilesPagination()
-    paginated_perfiles = paginator.paginate_queryset(perfiles, request)
-    serializer = PerfilModeloSerializer(paginated_perfiles, many=True)
+    paginated_perfiles = paginator.paginate_queryset(perfiles_qs, request)
+    serializer = PerfilModeloSerializer(paginated_perfiles, many=True, context={'request': request})
     return paginator.get_paginated_response(serializer.data)
 
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
+@cache_page(60)  # cachea 60 segundos la vista pública de un perfil
 def ver_perfil(request, id):
     """
     Endpoint público para ver un perfil de modelo por ID.
@@ -76,20 +108,59 @@ def ver_perfil(request, id):
     - suscripcion.esta_pausada=False
     """
     try:
-        perfil = PerfilModelo.objects.get(
-            id=id,
-            user__esta_verificada=True,
-            user__suscripcion__dias_restantes__gt=0,
-            user__suscripcion__esta_pausada=False
+        perfil = (
+            PerfilModelo.objects.select_related('user', 'user__suscripcion')
+            .prefetch_related(
+                'tags',
+                'servicios',
+                'galeria_fotos',
+                'resenas',
+                'resenas__cliente',
+            )
+            .get(
+                id=id,
+                user__esta_verificada=True,
+                user__suscripcion__dias_restantes__gt=0,
+                user__suscripcion__esta_pausada=False,
+            )
         )
-        serializer = PerfilModeloSerializer(perfil)
+        serializer = PerfilModeloSerializer(perfil, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
     except PerfilModelo.DoesNotExist:
         return Response({"error": "Perfil no encontrado o no disponible"}, status=status.HTTP_404_NOT_FOUND)
 
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated, IsModeloUser])
+def mi_perfil(request):
+    """Devuelve el perfil de modelo asociado al usuario autenticado."""
+    try:
+        perfil = request.user.perfil_modelo
+    except PerfilModelo.DoesNotExist:
+        return Response(
+            {"error": "No tienes un perfil de modelo asociado"},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    serializer = PerfilModeloSerializer(perfil, context={'request': request})
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
 @permission_classes([AllowAny])
+@cache_page(300)
+def listar_servicios_catalogo(request):
+    """
+    Lista el catálogo global de servicios activos.
+    """
+    catalogo = ServicioCatalogo.objects.filter(activo=True).order_by('nombre')
+    serializer = ServicioCatalogoSerializer(catalogo, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+@cache_page(300)  # cachea 5 minutos la lista de tags públicos
 def listar_tags(request):
     """
     Endpoint público para listar todos los tags disponibles.
@@ -100,16 +171,74 @@ def listar_tags(request):
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def listar_mis_likes(request):
+    """Lista los perfiles a los que el cliente ha dado 'me gusta'. Solo clientes (no modelos)."""
+    if request.user.es_modelo:
+        return Response({"error": "Los modelos no usan likes de cliente"}, status=status.HTTP_403_FORBIDDEN)
+
+    likes = PerfilLike.objects.filter(user=request.user).select_related('perfil_modelo')
+    data = [
+        {
+            "perfil_id": like.perfil_modelo.id,
+            "nombre_artistico": like.perfil_modelo.nombre_artistico,
+            "foto_perfil": like.perfil_modelo.foto_perfil.url if like.perfil_modelo.foto_perfil else None,
+        }
+        for like in likes
+    ]
+    return Response(data, status=status.HTTP_200_OK)
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+def dar_like(request, id):
+    """Marca like de un cliente sobre un perfil de modelo."""
+    if request.user.es_modelo:
+        return Response({"error": "Los modelos no pueden dar like"}, status=status.HTTP_403_FORBIDDEN)
+    try:
+        perfil = PerfilModelo.objects.get(id=id)
+    except PerfilModelo.DoesNotExist:
+        return Response({"error": "Perfil no encontrado"}, status=status.HTTP_404_NOT_FOUND)
+    PerfilLike.objects.get_or_create(user=request.user, perfil_modelo=perfil)
+    return Response({"message": "Like registrado"}, status=status.HTTP_201_CREATED)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def quitar_like(request, id):
+    """Elimina el like de un cliente sobre un perfil de modelo."""
+    if request.user.es_modelo:
+        return Response({"error": "Los modelos no pueden dar like"}, status=status.HTTP_403_FORBIDDEN)
+    PerfilLike.objects.filter(user=request.user, perfil_modelo_id=id).delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsModeloUser])
 def crear_perfil(request):
     """
-    Crear perfil de modelo. El campo ciudad es requerido.
+    Crear perfil de modelo para el usuario autenticado.
+    - Solo usuarios marcados como modelo (es_modelo=True) pueden usar este endpoint.
+    - El perfil creado queda asociado siempre al request.user.
     """
-    serializer = PerfilModeloSerializer(data=request.data)
+    data = request.data.copy()
+    # Compat: si envían 'ciudad' como nombre/ID, mapear a ciudad_id
+    if 'ciudad_id' not in data and 'ciudad' in data:
+        ciudad_val = data.get('ciudad')
+        if isinstance(ciudad_val, str) and ciudad_val.isdigit():
+            data['ciudad_id'] = ciudad_val
+        else:
+            try:
+                ciudad_obj = Ciudad.objects.get(nombre__iexact=ciudad_val)
+                data['ciudad_id'] = ciudad_obj.id
+            except Ciudad.DoesNotExist:
+                pass
+
+    serializer = PerfilModeloSerializer(data=data)
     if serializer.is_valid():
-        serializer.save()
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        perfil = serializer.save(user=request.user)
+        return Response(PerfilModeloSerializer(perfil, context={'request': request}).data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -144,11 +273,34 @@ def solicitar_cambio_ciudad(request):
             {"error": "Ya tienes una solicitud de cambio de ciudad pendiente"},
             status=status.HTTP_400_BAD_REQUEST
         )
+
+    # Cooldown opcional: 7 días desde última solicitud aprobada o rechazada
+    from django.utils import timezone
+    cooldown_days = getattr(settings, "CAMBIO_CIUDAD_COOLDOWN_DAYS", 7)
+    if cooldown_days:
+        ultima = SolicitudCambioCiudad.objects.filter(perfil=perfil).order_by('-fecha_solicitud').first()
+        if ultima and ultima.fecha_solicitud >= timezone.now() - timezone.timedelta(days=cooldown_days):
+            return Response(
+                {"error": f"Debes esperar {cooldown_days} días entre solicitudes de cambio de ciudad."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
     
     # Crear la solicitud
     data = request.data.copy()
     data['perfil'] = perfil.id
-    
+
+    # Compat: aceptar ciudad_nueva o ciudad_nueva_id
+    if 'ciudad_nueva_id' not in data:
+        ciudad_val = data.get('ciudad_nueva')
+        if ciudad_val:
+            if isinstance(ciudad_val, str) and ciudad_val.isdigit():
+                data['ciudad_nueva_id'] = ciudad_val
+            else:
+                try:
+                    ciudad_obj = Ciudad.objects.get(nombre__iexact=ciudad_val)
+                    data['ciudad_nueva_id'] = ciudad_obj.id
+                except Ciudad.DoesNotExist:
+                    pass
     serializer = SolicitudCambioCiudadSerializer(data=data)
     if serializer.is_valid():
         solicitud = serializer.save()
@@ -302,7 +454,7 @@ def actualizar_tags(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsModeloUser])
 def listar_mis_servicios(request):
     """
     Endpoint para que una modelo liste todos sus servicios.
@@ -321,17 +473,16 @@ def listar_mis_servicios(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsModeloUser])
 def crear_servicio(request):
     """
     Endpoint para que una modelo cree un nuevo servicio.
     
     Body esperado:
-    {
-        "nombre": "Servicio VIP"
-    }
+    - catalogo_id (opcional si custom_text)
+    - custom_text (opcional; requerido si no hay catalogo_id)
     
-    Nota: Los servicios solo incluyen nombres, no precios.
+    Si el catalogo elegido no permite custom, custom_text debe ir vacío.
     """
     try:
         perfil = request.user.perfil_modelo
@@ -352,7 +503,7 @@ def crear_servicio(request):
 
 
 @api_view(['PUT', 'PATCH'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsModeloUser])
 def actualizar_servicio(request, servicio_id):
     """
     Endpoint para que una modelo actualice uno de sus servicios.
@@ -391,7 +542,7 @@ def actualizar_servicio(request, servicio_id):
 
 
 @api_view(['DELETE'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsModeloUser])
 def eliminar_servicio(request, servicio_id):
     """
     Endpoint para que una modelo elimine uno de sus servicios.
@@ -421,7 +572,7 @@ def eliminar_servicio(request, servicio_id):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsModeloUser])
 def listar_mis_fotos(request):
     """
     Endpoint para que una modelo liste todas sus fotos de galería.
@@ -440,7 +591,7 @@ def listar_mis_fotos(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsModeloUser])
 def subir_foto(request):
     """
     Endpoint para que una modelo suba una nueva foto a su galería.
@@ -475,7 +626,7 @@ def subir_foto(request):
 
 
 @api_view(['DELETE'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsModeloUser])
 def eliminar_foto(request, foto_id):
     """
     Endpoint para que una modelo elimine una foto de su galería.

@@ -10,5 +10,7 @@ urlpatterns = [
     path('suscribir/', views.crear_renovar_suscripcion, name='crear_renovar_suscripcion'),
     path('pausar/', views.pausar_suscripcion, name='pausar_suscripcion'),
     path('resumir/', views.resumir_suscripcion, name='resumir_suscripcion'),
-    
+    path('solicitudes/', views.crear_solicitud_suscripcion, name='crear_solicitud_suscripcion'),
+    path('solicitudes/mias/', views.listar_mis_solicitudes_suscripcion, name='listar_mis_solicitudes_suscripcion'),
+    path('solicitudes/<int:solicitud_id>/aprobar/', views.aprobar_solicitud_suscripcion, name='aprobar_solicitud_suscripcion'),
 ]

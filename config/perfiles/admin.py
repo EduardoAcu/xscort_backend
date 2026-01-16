@@ -1,17 +1,24 @@
 from django.contrib import admin
-from .models import PerfilModelo, Servicio, GaleriaFoto, Tag, SolicitudCambioCiudad
+from .models import PerfilModelo, Servicio, GaleriaFoto, Tag, SolicitudCambioCiudad, ServicioCatalogo
 
 @admin.register(PerfilModelo)
 class PerfilModeloAdmin(admin.ModelAdmin):
     list_display = ['nombre_artistico', 'ciudad', 'genero', 'edad']
     list_filter = ['genero', 'ciudad']
-    search_fields = ['nombre_artistico', 'ciudad']
+    search_fields = ['nombre_artistico', 'ciudad__nombre']
     filter_horizontal = ['tags']
 
 @admin.register(Servicio)
 class ServicioAdmin(admin.ModelAdmin):
-    list_display = ['nombre', 'perfil_modelo']
-    list_filter = ['perfil_modelo']
+    list_display = ['catalogo', 'custom_text', 'perfil_modelo']
+    list_filter = ['catalogo', 'perfil_modelo']
+    search_fields = ['catalogo__nombre', 'custom_text']
+
+
+@admin.register(ServicioCatalogo)
+class ServicioCatalogoAdmin(admin.ModelAdmin):
+    list_display = ['nombre', 'activo', 'permite_custom']
+    list_filter = ['activo', 'permite_custom']
     search_fields = ['nombre']
 
 @admin.register(GaleriaFoto)

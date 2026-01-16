@@ -2,8 +2,11 @@ from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
-from .models import Plan, Suscripcion
-from .serializers import PlanSerializer, SuscripcionSerializer
+import logging
+from .models import Plan, Suscripcion, SolicitudSuscripcion
+from .serializers import PlanSerializer, SuscripcionSerializer, SolicitudSuscripcionSerializer
+
+logger = logging.getLogger('xscort')
 
 
 @api_view(['GET'])
@@ -50,6 +53,14 @@ def crear_renovar_suscripcion(request):
     
     serializer = SuscripcionSerializer(suscripcion)
     mensaje = "Suscripción creada" if created else "Suscripción renovada"
+
+    logger.info("Suscripción creada/renovada", extra={
+        'user_id': user.id,
+        'username': user.username,
+        'plan_id': plan.id,
+        'plan_nombre': plan.nombre,
+        'dias_restantes': suscripcion.dias_restantes,
+    })
     
     return Response({
         "mensaje": mensaje,
@@ -169,3 +180,77 @@ def obtener_suscripcion(request):
             {"error": "No tienes una suscripción activa"},
             status=status.HTTP_404_NOT_FOUND
         )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def crear_solicitud_suscripcion(request):
+    """Crea una solicitud de suscripción con comprobante de pago.
+
+    Espera multipart/form-data con:
+    - plan_id: ID del plan seleccionado
+    - comprobante_pago: archivo de comprobante
+    """
+    user = request.user
+    plan_id = request.data.get('plan_id')
+    comprobante = request.FILES.get('comprobante_pago')
+
+    if not plan_id:
+        return Response({"error": "Se requiere plan_id"}, status=status.HTTP_400_BAD_REQUEST)
+    if not comprobante:
+        return Response({"error": "Se requiere comprobante_pago"}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        plan = Plan.objects.get(id=plan_id)
+    except Plan.DoesNotExist:
+        return Response({"error": "Plan no encontrado"}, status=status.HTTP_404_NOT_FOUND)
+
+    solicitud = SolicitudSuscripcion.objects.create(
+        user=user,
+        plan=plan,
+        comprobante_pago=comprobante,
+    )
+
+    serializer = SolicitudSuscripcionSerializer(solicitud)
+
+    logger.info("Solicitud de suscripción creada", extra={
+        'user_id': user.id,
+        'username': user.username,
+        'plan_id': plan.id,
+        'plan_nombre': plan.nombre,
+        'solicitud_id': solicitud.id,
+    })
+
+    return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def listar_mis_solicitudes_suscripcion(request):
+    """Lista las solicitudes de suscripción del usuario autenticado."""
+    user = request.user
+    qs = SolicitudSuscripcion.objects.filter(user=user).order_by('-fecha_creacion')
+    serializer = SolicitudSuscripcionSerializer(qs, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def aprobar_solicitud_suscripcion(request, solicitud_id):
+    """
+    Endpoint para que un admin apruebe una solicitud de suscripción y aplique el plan.
+    """
+    if not request.user.is_staff:
+        return Response({"error": "Solo administradores"}, status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        solicitud = SolicitudSuscripcion.objects.get(id=solicitud_id)
+    except SolicitudSuscripcion.DoesNotExist:
+        return Response({"error": "Solicitud no encontrada"}, status=status.HTTP_404_NOT_FOUND)
+
+    solicitud.aplicar_plan()
+    solicitud.estado = "aprobada"
+    solicitud.save()
+
+    serializer = SolicitudSuscripcionSerializer(solicitud)
+    return Response(serializer.data, status=status.HTTP_200_OK)

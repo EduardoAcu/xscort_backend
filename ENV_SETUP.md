@@ -130,6 +130,9 @@ ADMIN_EMAIL=admin@xscort.com
 |----------|-------------|---------|
 | `CORS_ALLOWED_ORIGINS` | Orígenes permitidos (con protocolo, separados por coma) | `http://localhost:3000,https://xscort.cl` |
 | `CORS_ALLOW_CREDENTIALS` | Permitir credenciales | `True`, `False` |
+| `FRONTEND_ORIGIN` | Origen principal del front (se añade automáticamente a CORS_ALLOWED_ORIGINS) | `https://app.xscort.cl` |
+
+**Cookies en producción:** se establecen como `Secure=True` y `SameSite=None`. Asegúrate de usar HTTPS end-to-end y de que el dominio del frontend esté incluido en `ALLOWED_HOSTS` y `CORS_ALLOWED_ORIGINS/FRONTEND_ORIGIN`.
 
 ## Configuraciones por Ambiente
 

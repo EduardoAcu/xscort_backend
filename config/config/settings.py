@@ -57,6 +57,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'usuarios.middleware.JWTAuthCookieMiddleware',  # Lee JWT desde cookies
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'debug_toolbar.middleware.DebugToolbarMiddleware',
@@ -139,6 +140,19 @@ STATIC_ROOT = env('STATIC_ROOT', default=os.path.join(BASE_DIR, 'staticfiles'))
 MEDIA_URL = env('MEDIA_URL', default='/media/')
 MEDIA_ROOT = env('MEDIA_ROOT', default=os.path.join(BASE_DIR, 'media'))
 
+# Security settings
+# In production these should enforce HTTPS and secure cookies.
+SECURE_SSL_REDIRECT = env.bool('SECURE_SSL_REDIRECT', default=not DEBUG)
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SESSION_COOKIE_SECURE = env.bool('SESSION_COOKIE_SECURE', default=not DEBUG)
+CSRF_COOKIE_SECURE = env.bool('CSRF_COOKIE_SECURE', default=not DEBUG)
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = False
+SECURE_HSTS_SECONDS = env.int('SECURE_HSTS_SECONDS', default=0 if DEBUG else 31536000)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = env.bool('SECURE_HSTS_INCLUDE_SUBDOMAINS', default=not DEBUG)
+SECURE_HSTS_PRELOAD = env.bool('SECURE_HSTS_PRELOAD', default=False)
+
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
@@ -155,6 +169,14 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
+    'DEFAULT_THROTTLE_CLASSES': (
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ),
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': env('DRF_THROTTLE_RATE_ANON', default='100/hour'),
+        'user': env('DRF_THROTTLE_RATE_USER', default='1000/hour'),
+    },
 }
 
 # SimpleJWT configuration
@@ -195,8 +217,16 @@ CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=[
     'http://localhost:3000',
     'http://127.0.0.1:3000',
 ])
+# Permitir origen adicional definido como FRONTEND_ORIGIN (ej. https://app.xscort.cl)
+FRONTEND_ORIGIN = env('FRONTEND_ORIGIN', default=None)
+if FRONTEND_ORIGIN and FRONTEND_ORIGIN not in CORS_ALLOWED_ORIGINS:
+    CORS_ALLOWED_ORIGINS.append(FRONTEND_ORIGIN)
 
-CORS_ALLOW_CREDENTIALS = env.bool('CORS_ALLOW_CREDENTIALS', default=True)
+# IMPORTANTE: Habilitar credentials para cookies HttpOnly
+CORS_ALLOW_CREDENTIALS = True
+
+# Permitir que el frontend vea estos headers en las respuestas
+CORS_EXPOSE_HEADERS = ['Set-Cookie']
 
 # Debug Toolbar Configuration (solo en desarrollo)
 if DEBUG:
@@ -221,5 +251,41 @@ DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='noreply@xscort.cl')
 # Admin email for notifications
 ADMIN_EMAIL = env('ADMIN_EMAIL', default='soporte@xscort.cl')
 
+# Frontend URL (para links en emails)
+FRONTEND_URL = env('FRONTEND_URL', default='http://localhost:3000')
+
+# Disclaimer legal mostrado en respuestas públicas
+LEGAL_DISCLAIMER = env('LEGAL_DISCLAIMER', default='Servicio publicitario sin relación laboral con las anunciantes.')
+CAMBIO_CIUDAD_COOLDOWN_DAYS = env.int('CAMBIO_CIUDAD_COOLDOWN_DAYS', default=7)
+
 # Importar configuraciones de apps externas
 from .jazzmin_config import *
+
+# Logging básico para registrar eventos importantes en consola
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '[{levelname}] {asctime} {name} - {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+        },
+        'xscort': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}
