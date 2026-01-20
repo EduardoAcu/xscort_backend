@@ -320,6 +320,21 @@ class RequestModelVerificationView(APIView):
 
     def post(self, request):
         user = request.user
+        ciudad_id = request.data.get('ciudad_id')
+        
+        # Validar que se proporcionó ciudad_id
+        if not ciudad_id:
+            return Response(
+                {"error": "Debe seleccionar una ciudad (ciudad_id) para solicitar ser modelo"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Importar Ciudad para validar
+        from perfiles.models import Ciudad
+        try:
+            ciudad = Ciudad.objects.get(id=ciudad_id)
+        except Ciudad.DoesNotExist:
+            return Response({"error": "Ciudad no válida"}, status=status.HTTP_400_BAD_REQUEST)
         
         # Verificar si ya es modelo verificado
         if user.es_modelo and user.esta_verificada:
