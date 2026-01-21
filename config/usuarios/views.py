@@ -17,14 +17,20 @@ logger = logging.getLogger('xscort')
 
 def set_auth_cookies(response, access_token, refresh_token=None):
     """Helper para establecer cookies de autenticación con configuración correcta"""
-    secure = True
-    # Para que el frontend en localhost:3000 envíe cookies hacia localhost:8000, necesitamos SameSite=None.
-    # En producción (HTTPS) también usamos None.
+    # En desarrollo (DEBUG=True), usar secure=False para HTTP
+    # En producción (DEBUG=False), usar secure=True para HTTPS
+    secure = not settings.DEBUG
+    
+    # SameSite policy:
+    # - En desarrollo (HTTP): usar 'Lax' para permitir cookies cross-site
+    # - En producción (HTTPS): usar 'None' (requiere secure=True)
+    samesite = 'None' if not settings.DEBUG else 'Lax'
+    
     cookie_settings = {
         'httponly': True,
         'path': '/',
-        'samesite': 'None',
-        'secure': secure,  # en dev (http) secure=False, en prod True
+        'samesite': samesite,
+        'secure': secure,  # Automático: False en dev (HTTP), True en prod (HTTPS)
     }
 
     # Access token (1 hora)
@@ -142,6 +148,8 @@ class UserLoginView(APIView):
             access_token = str(refresh.access_token)
             refresh_token = str(refresh)
             
+            logger.info(f"Tokens generados - Access: {access_token[:20]}... Refresh: {refresh_token[:20]}...")
+            
             # Crear respuesta sin tokens en el body
             response = Response({
                 'message': 'Login exitoso',
@@ -150,6 +158,7 @@ class UserLoginView(APIView):
             
             # Establecer cookies HttpOnly
             set_auth_cookies(response, access_token, refresh_token)
+            logger.info(f"Cookies establecidas - secure={not settings.DEBUG}")
             
             return response
         
@@ -320,6 +329,8 @@ class RequestModelVerificationView(APIView):
 
     def post(self, request):
         user = request.user
+        logger.info(f"RequestModelVerificationView - User: {user}, Authenticated: {user.is_authenticated}, Cookies: {request.COOKIES}")
+        
         ciudad_id = request.data.get('ciudad_id')
         
         # Validar que se proporcionó ciudad_id

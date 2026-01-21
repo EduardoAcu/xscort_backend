@@ -232,6 +232,7 @@ CORS_EXPOSE_HEADERS = ['Set-Cookie']
 if DEBUG:
     INTERNAL_IPS = [
         '127.0.0.1',
+        '192.168.1.26',
     ]
 
 # django-crontab configuration
