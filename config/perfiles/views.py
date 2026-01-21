@@ -77,10 +77,18 @@ def listar_perfiles(request):
     if tags:
         tag_list = [tag.strip() for tag in tags.split(',')]
         perfiles_qs = perfiles_qs.filter(tags__nombre__in=tag_list).distinct()
-    # Filtro por servicio (nombre contiene)
+    # Filtro por servicio:
+    # - Si se pasa un ID numérico, se interpreta como el id del ServicioCatalogo
+    # - Si se pasa texto, se busca tanto en el nombre del catálogo como en custom_text
     servicio = request.query_params.get('servicio', None)
     if servicio:
-        perfiles_qs = perfiles_qs.filter(servicios__nombre__icontains=servicio).distinct()
+        if servicio.isdigit():
+            perfiles_qs = perfiles_qs.filter(servicios__catalogo__id=int(servicio)).distinct()
+        else:
+            perfiles_qs = perfiles_qs.filter(
+                Q(servicios__catalogo__nombre__icontains=servicio) |
+                Q(servicios__custom_text__icontains=servicio)
+            ).distinct()
     
     # Búsqueda por texto en nombre_artistico y biografia
     search = request.query_params.get('search', None)
