@@ -113,7 +113,7 @@ if AWS_ACCESS_KEY_ID:
 
     # USAR TU DOMINIO PERSONALIZADO
     # Esto hará que las URLs sean https://media.xscort.cl/foto.jpg
-    AWS_S3_CUSTOM_DOMAIN = 'media.xscort.cl'
+    AWS_S3_CUSTOM_DOMAIN = f'media.xscort.cl/{AWS_STORAGE_BUCKET_NAME}'
     
     DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
     MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/'
