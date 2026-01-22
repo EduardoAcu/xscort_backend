@@ -112,7 +112,7 @@ AWS_QUERYSTRING_AUTH = False  # Evita que las URLs expiren (necesario para acces
 
 # USAR TU DOMINIO PERSONALIZADO
 # Esto hará que las URLs sean https://media.xscort.cl/foto.jpg
-AWS_S3_CUSTOM_DOMAIN = f'media.xscort.cl/'
+AWS_S3_CUSTOM_DOMAIN = f'media.xscort.cl'
     
 STORAGES = {
     "default": {
