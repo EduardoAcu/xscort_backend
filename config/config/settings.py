@@ -94,6 +94,8 @@ STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 # Whitenoise: Compresión y caché
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+WHITENOISE_USE_FINDERS = True 
+WHITENOISE_MANIFEST_STRICT = False 
 
 # Configuración de Almacenamiento en la Nube (Cloudflare R2)
 AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID', default=None)
