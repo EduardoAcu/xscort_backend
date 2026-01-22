@@ -100,27 +100,36 @@ WHITENOISE_MANIFEST_STRICT = False
 # Configuración de Almacenamiento en la Nube (Cloudflare R2)
 AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID', default=None)
 
+# settings.py
+
 if AWS_ACCESS_KEY_ID:
+    # 1. Credenciales (Las toma de Coolify)
+    AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID')
     AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY')
     AWS_STORAGE_BUCKET_NAME = env('AWS_STORAGE_BUCKET_NAME')
-    AWS_S3_ENDPOINT_URL = env('AWS_S3_ENDPOINT_URL')
-    AWS_S3_REGION_NAME = 'auto'
-    AWS_S3_FILE_OVERWRITE = False
-    
-    # Configuración de firma para Cloudflare R2
-    AWS_S3_SIGNATURE_VERSION = 's3v4'
-    AWS_QUERYSTRING_AUTH = False  # Evita que las URLs expiren (necesario para acceso público)
 
-    # USAR TU DOMINIO PERSONALIZADO
-    # Esto hará que las URLs sean https://media.xscort.cl/foto.jpg
-    AWS_S3_CUSTOM_DOMAIN = f'media.xscort.cl/{AWS_STORAGE_BUCKET_NAME}'
-    
+    # 2. Endpoint LIMPIO (Sin el nombre del bucket al final)
+    # En Coolify debe ser: https://xxxx.r2.cloudflarestorage.com
+    AWS_S3_ENDPOINT_URL = env('AWS_S3_ENDPOINT_URL')
+
+    # 3. Configuración obligatoria para R2
+    AWS_S3_REGION_NAME = 'auto'
+    AWS_S3_SIGNATURE_VERSION = 's3v4'
+    AWS_S3_FILE_OVERWRITE = False
+    AWS_QUERYSTRING_AUTH = False  # Importante: URLs públicas sin tokens raros
+
+    # 4. Dominio Personalizado
+    # Al poner esto, Django confía en que Cloudflare (Paso 1) hará el trabajo sucio.
+    AWS_S3_CUSTOM_DOMAIN = 'media.xscort.cl'
+
+    # 5. Almacenamiento
     DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
     MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/'
+
 else:
     MEDIA_URL = '/media/'
     MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
-
+    
 # 7. SEGURIDAD Y CORS
 AUTH_USER_MODEL = 'usuarios.CustomUser'
 
