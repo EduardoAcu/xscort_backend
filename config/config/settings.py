@@ -109,7 +109,7 @@ if AWS_ACCESS_KEY_ID:
     AWS_S3_FILE_OVERWRITE = False
     
     DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
-    MEDIA_URL = env('MEDIA_URL_PUBLIC', default=f"https://pub-xxxx.r2.dev/")
+    MEDIA_URL = env('MEDIA_URL_PUBLIC', default=f"https://pub-cfd58f26793741d989b193201ba7ff14.r2.dev/")
 else:
     # Si no, usa almacenamiento local
     MEDIA_URL = '/media/'
