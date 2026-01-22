@@ -101,17 +101,23 @@ WHITENOISE_MANIFEST_STRICT = False
 AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID', default=None)
 
 if AWS_ACCESS_KEY_ID:
-    # Si estas variables están en Coolify, usa R2
     AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY')
     AWS_STORAGE_BUCKET_NAME = env('AWS_STORAGE_BUCKET_NAME')
     AWS_S3_ENDPOINT_URL = env('AWS_S3_ENDPOINT_URL')
     AWS_S3_REGION_NAME = 'auto'
     AWS_S3_FILE_OVERWRITE = False
     
+    # Configuración de firma para Cloudflare R2
+    AWS_S3_SIGNATURE_VERSION = 's3v4'
+    AWS_QUERYSTRING_AUTH = False  # Evita que las URLs expiren (necesario para acceso público)
+
+    # USAR TU DOMINIO PERSONALIZADO
+    # Esto hará que las URLs sean https://media.xscort.cl/foto.jpg
+    AWS_S3_CUSTOM_DOMAIN = 'media.xscort.cl'
+    
     DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
-    MEDIA_URL = env('MEDIA_URL_PUBLIC', default=f"https://pub-cfd58f26793741d989b193201ba7ff14.r2.dev/")
+    MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/'
 else:
-    # Si no, usa almacenamiento local
     MEDIA_URL = '/media/'
     MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
