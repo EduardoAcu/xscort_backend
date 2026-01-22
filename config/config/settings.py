@@ -114,7 +114,15 @@ AWS_QUERYSTRING_AUTH = False  # Evita que las URLs expiren (necesario para acces
 # Esto hará que las URLs sean https://media.xscort.cl/foto.jpg
 AWS_S3_CUSTOM_DOMAIN = f'media.xscort.cl/{AWS_STORAGE_BUCKET_NAME}'
     
-DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+STORAGES = {
+    "default": {
+        "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
+
 MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/'
 # 7. SEGURIDAD Y CORS
 AUTH_USER_MODEL = 'usuarios.CustomUser'
