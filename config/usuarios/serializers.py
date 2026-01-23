@@ -89,7 +89,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
         # Verificar duplicados exactos en la BD
         if CustomUser.objects.filter(username__iexact=slug_value).exists():
-            raise serializers.ValidationError("Este nombre de usuario ya está en uso. Por favor elige otro.")
+            raise serializers.ValidationError()
         
         # Retornamos el valor limpio (slugified) para que se guarde así
         return slug_value
