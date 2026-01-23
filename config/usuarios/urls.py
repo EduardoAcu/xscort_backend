@@ -12,6 +12,7 @@ from .views import (
     LatestTermsView,
     LatestPrivacyView,
     UserMeView,
+    ValidateUsernameView,
 )
 
 urlpatterns = [
@@ -19,6 +20,8 @@ urlpatterns = [
     path('token/', UserLoginView.as_view(), name='user-login'),
     path('token/refresh/', TokenRefreshCookieView.as_view(), name='token-refresh'),
     path('logout/', UserLogoutView.as_view(), name='user-logout'),
+    # Validación de username
+    path('validate-username/', ValidateUsernameView.as_view(), name='validate-username'),
     # Recovery
     path('forgot-password/', ForgotPasswordView.as_view(), name='forgot-password'),
     path('reset-password/', ResetPasswordView.as_view(), name='reset-password'),

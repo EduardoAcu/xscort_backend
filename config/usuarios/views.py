@@ -7,7 +7,7 @@ from django.contrib.auth import authenticate
 from django.core.mail import send_mail
 from django.conf import settings
 import logging
-from .serializers import UserRegistrationSerializer, UserSerializer, VerificationDocumentsSerializer, UserMeSerializer
+from .serializers import UserRegistrationSerializer, UserSerializer, VerificationDocumentsSerializer, UserMeSerializer, UsernameCheckSerializer
 from .models import CustomUser, LegalDocument, AgeConsentLog
 from .models_password_reset import PasswordResetToken
 from perfiles.models import PerfilModelo
@@ -541,3 +541,41 @@ class TokenRefreshCookieView(APIView):
             return response
         except Exception:
             return Response({'error': 'Refresh token inválido o expirado'}, status=status.HTTP_401_UNAUTHORIZED)
+
+
+class ValidateUsernameView(APIView):
+    """
+    Valida si un nombre de usuario está disponible.
+    Endpoint: POST /api/validate-username/
+    
+    Body: { "username": "nombre_usuario" }
+    
+    Respuesta:
+    - available: true/false
+    - username: el username validado
+    - message: mensaje descriptivo
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = UsernameCheckSerializer(data=request.data)
+        if serializer.is_valid():
+            username = serializer.validated_data['username']
+            
+            # Verificar si el usuario existe
+            exists = CustomUser.objects.filter(username__iexact=username).exists()
+            
+            if exists:
+                return Response({
+                    'available': False,
+                    'username': username,
+                    'message': 'Este nombre de usuario ya está en uso'
+                }, status=status.HTTP_200_OK)
+            else:
+                return Response({
+                    'available': True,
+                    'username': username,
+                    'message': 'Este nombre de usuario está disponible'
+                }, status=status.HTTP_200_OK)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
