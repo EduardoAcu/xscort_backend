@@ -62,6 +62,11 @@ class CustomUser(AbstractUser):
     class Meta:
         verbose_name = 'Usuario'
         verbose_name_plural = 'Usuarios'
+        # Garantizar unicidad de username y email
+        constraints = [
+            models.UniqueConstraint(fields=['username'], name='unique_username'),
+            models.UniqueConstraint(fields=['email'], name='unique_email'),
+        ]
     
     def __str__(self):
         return self.username
