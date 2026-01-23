@@ -6,6 +6,35 @@ from dateutil.relativedelta import relativedelta
 from .models import CustomUser
 
 
+class UsernameCheckSerializer(serializers.Serializer):
+    """
+    Serializador para validar si un nombre de usuario está disponible.
+    """
+    username = serializers.CharField(
+        max_length=150,
+        required=True,
+        allow_blank=False,
+        trim_whitespace=True
+    )
+    
+    def validate_username(self, value):
+        """
+        Validar que el username tenga un formato válido.
+        Django por defecto permite: letras, dígitos y @/./+/-/_
+        """
+        # Convertir a slug para validación básica
+        slug_value = slugify(value)
+        if not slug_value:
+            raise serializers.ValidationError(
+                "El nombre de usuario debe contener al menos un carácter válido (letras o números)"
+            )
+        if len(value) < 3:
+            raise serializers.ValidationError(
+                "El nombre de usuario debe tener al menos 3 caracteres"
+            )
+        return value
+
+
 class UserRegistrationSerializer(serializers.ModelSerializer):
     """
     Serializer para el registro de nuevos usuarios.
