@@ -2,7 +2,10 @@ from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from django.utils import timezone
+from datetime import timedelta
 import logging
+
 from .models import Plan, Suscripcion, SolicitudSuscripcion
 from .serializers import PlanSerializer, SuscripcionSerializer, SolicitudSuscripcionSerializer
 
@@ -24,9 +27,8 @@ def listar_planes(request):
 @permission_classes([IsAuthenticated])
 def crear_renovar_suscripcion(request):
     """
-    Endpoint para que la modelo cree o renueve su suscripción.
-    Requiere: plan_id en el body.
-    Lógica: dias_restantes += dias_contratados del plan.
+    Endpoint MANUAL para crear/renovar suscripción (útil para pruebas o admin).
+    Lógica: Extiende la fecha de expiración o reinicia el contador.
     """
     plan_id = request.data.get('plan_id')
     
@@ -41,25 +43,38 @@ def crear_renovar_suscripcion(request):
     user = request.user
     
     # Crear o obtener suscripción existente
-    suscripcion, created = Suscripcion.objects.get_or_create(
-        user=user,
-        defaults={'plan': plan, 'dias_restantes': 0}
-    )
+    suscripcion, created = Suscripcion.objects.get_or_create(user=user)
     
-    # Renovar/aumentar días
+    # --- LÓGICA DE ACTUALIZACIÓN DE TIEMPO REAL ---
+    # (Idéntica a SolicitudSuscripcion.aplicar_plan)
+    
+    now = timezone.now()
+    dias_a_agregar = plan.dias_contratados
     suscripcion.plan = plan
-    suscripcion.dias_restantes += plan.dias_contratados
+
+    if suscripcion.esta_pausada:
+        # Si está pausada, sumamos al "congelador"
+        dias_actuales = suscripcion.dias_restantes if suscripcion.dias_restantes else 0
+        suscripcion.dias_restantes = dias_actuales + dias_a_agregar
+        # Opcional: Podrías despausar automáticamente aquí si quisieras
+    else:
+        # Si está activa o expirada
+        if suscripcion.fecha_expiracion and suscripcion.fecha_expiracion > now:
+            # Si está vigente, EXTENDEMOS la fecha actual
+            suscripcion.fecha_expiracion += timedelta(days=dias_a_agregar)
+        else:
+            # Si es nueva o ya expiró, empieza desde HOY
+            suscripcion.fecha_expiracion = now + timedelta(days=dias_a_agregar)
+
     suscripcion.save()
     
     serializer = SuscripcionSerializer(suscripcion)
-    mensaje = "Suscripción creada" if created else "Suscripción renovada"
+    mensaje = "Suscripción creada" if created else "Suscripción renovada exitosamente"
 
-    logger.info("Suscripción creada/renovada", extra={
+    logger.info("Suscripción manual actualizada", extra={
         'user_id': user.id,
-        'username': user.username,
         'plan_id': plan.id,
-        'plan_nombre': plan.nombre,
-        'dias_restantes': suscripcion.dias_restantes,
+        'nueva_expiracion': suscripcion.fecha_expiracion
     })
     
     return Response({
@@ -72,10 +87,7 @@ def crear_renovar_suscripcion(request):
 @permission_classes([IsAuthenticated])
 def pausar_suscripcion(request):
     """
-    Endpoint para que una modelo pause su suscripción.
-    Pone esta_pausada = True.
-    
-    Mientras esté pausada, el perfil no será visible públicamente.
+    Endpoint para pausar. Delega toda la lógica al modelo.
     """
     user = request.user
     
@@ -87,29 +99,27 @@ def pausar_suscripcion(request):
             status=status.HTTP_404_NOT_FOUND
         )
     
-    # Check if already paused
     if suscripcion.esta_pausada:
         return Response(
             {"error": "Tu suscripción ya está pausada"},
             status=status.HTTP_400_BAD_REQUEST
         )
     
-    # Check if there are remaining days
-    if suscripcion.dias_restantes <= 0:
-        return Response(
-            {"error": "No puedes pausar una suscripción sin días restantes"},
+    # Verificar validez antes de pausar (opcional, el modelo también lo maneja)
+    if not suscripcion.fecha_expiracion or suscripcion.fecha_expiracion <= timezone.now():
+         return Response(
+            {"error": "Tu suscripción ha expirado, no puedes pausarla."},
             status=status.HTTP_400_BAD_REQUEST
         )
-    
-    # Pause subscription
-    suscripcion.esta_pausada = True
-    suscripcion.save()
+
+    # --- LLAMADA AL MÉTODO DEL MODELO ---
+    suscripcion.pausar()
     
     serializer = SuscripcionSerializer(suscripcion)
     
     return Response(
         {
-            "mensaje": "Suscripción pausada exitosamente. Tu perfil no será visible hasta que la reactives.",
+            "mensaje": "Suscripción pausada exitosamente. Tu tiempo restante se ha congelado.",
             "suscripcion": serializer.data
         },
         status=status.HTTP_200_OK
@@ -120,10 +130,7 @@ def pausar_suscripcion(request):
 @permission_classes([IsAuthenticated])
 def resumir_suscripcion(request):
     """
-    Endpoint para que una modelo reanude/reactive su suscripción.
-    Pone esta_pausada = False.
-    
-    Después de reanudar, el perfil volverá a ser visible públicamente.
+    Endpoint para reanudar. Delega toda la lógica al modelo.
     """
     user = request.user
     
@@ -135,33 +142,25 @@ def resumir_suscripcion(request):
             status=status.HTTP_404_NOT_FOUND
         )
     
-    # Check if already active (not paused)
     if not suscripcion.esta_pausada:
         return Response(
             {"error": "Tu suscripción ya está activa"},
             status=status.HTTP_400_BAD_REQUEST
         )
     
-    # Check if there are remaining days
-    if suscripcion.dias_restantes <= 0:
-        return Response(
-            {"error": "No puedes reanudar una suscripción sin días restantes. Por favor, renueva tu plan."},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-    
-    # Resume subscription
-    suscripcion.esta_pausada = False
-    suscripcion.save()
+    # --- LLAMADA AL MÉTODO DEL MODELO ---
+    suscripcion.reanudar()
     
     serializer = SuscripcionSerializer(suscripcion)
     
     return Response(
         {
-            "mensaje": "Suscripción reactivada exitosamente. Tu perfil volverá a ser visible.",
+            "mensaje": "Suscripción reactivada exitosamente. Tu perfil vuelve a ser visible.",
             "suscripcion": serializer.data
         },
         status=status.HTTP_200_OK
     )
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -172,7 +171,14 @@ def obtener_suscripcion(request):
     user = request.user
     
     try:
-        suscripcion = Suscripcion.objects.get(user=user)
+        # Usamos select_related para traer el plan en una sola consulta
+        suscripcion = Suscripcion.objects.select_related('plan').get(user=user)
+        
+        # Opcional: Verificar si expiró para pausar/limpiar automáticamente 
+        # (Aunque el serializer ya devuelve 0 días, a veces es útil limpiar estado)
+        # if suscripcion.fecha_expiracion and suscripcion.fecha_expiracion < timezone.now():
+        #     pass 
+
         serializer = SuscripcionSerializer(suscripcion)
         return Response(serializer.data, status=status.HTTP_200_OK)
     except Suscripcion.DoesNotExist:
@@ -185,11 +191,8 @@ def obtener_suscripcion(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def crear_solicitud_suscripcion(request):
-    """Crea una solicitud de suscripción con comprobante de pago.
-
-    Espera multipart/form-data con:
-    - plan_id: ID del plan seleccionado
-    - comprobante_pago: archivo de comprobante
+    """
+    Crea una solicitud para que un admin la apruebe.
     """
     user = request.user
     plan_id = request.data.get('plan_id')
@@ -213,13 +216,7 @@ def crear_solicitud_suscripcion(request):
 
     serializer = SolicitudSuscripcionSerializer(solicitud)
 
-    logger.info("Solicitud de suscripción creada", extra={
-        'user_id': user.id,
-        'username': user.username,
-        'plan_id': plan.id,
-        'plan_nombre': plan.nombre,
-        'solicitud_id': solicitud.id,
-    })
+    logger.info("Solicitud creada", extra={'user': user.username, 'plan': plan.nombre})
 
     return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -227,7 +224,7 @@ def crear_solicitud_suscripcion(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def listar_mis_solicitudes_suscripcion(request):
-    """Lista las solicitudes de suscripción del usuario autenticado."""
+    """Lista las solicitudes del usuario."""
     user = request.user
     qs = SolicitudSuscripcion.objects.filter(user=user).order_by('-fecha_creacion')
     serializer = SolicitudSuscripcionSerializer(qs, many=True)
@@ -238,7 +235,7 @@ def listar_mis_solicitudes_suscripcion(request):
 @permission_classes([IsAuthenticated])
 def aprobar_solicitud_suscripcion(request, solicitud_id):
     """
-    Endpoint para que un admin apruebe una solicitud de suscripción y aplique el plan.
+    Admin aprueba la solicitud.
     """
     if not request.user.is_staff:
         return Response({"error": "Solo administradores"}, status=status.HTTP_403_FORBIDDEN)
@@ -248,7 +245,12 @@ def aprobar_solicitud_suscripcion(request, solicitud_id):
     except SolicitudSuscripcion.DoesNotExist:
         return Response({"error": "Solicitud no encontrada"}, status=status.HTTP_404_NOT_FOUND)
 
+    if solicitud.estado == 'aprobada':
+         return Response({"error": "Esta solicitud ya fue aprobada"}, status=status.HTTP_400_BAD_REQUEST)
+
+    # La lógica pesada ahora vive en el modelo SolicitudSuscripcion
     solicitud.aplicar_plan()
+    
     solicitud.estado = "aprobada"
     solicitud.save()
 
