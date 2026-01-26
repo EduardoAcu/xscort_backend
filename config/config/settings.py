@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'debug_toolbar'
     
     # Librerías de Terceros
     'rest_framework',
@@ -48,6 +49,7 @@ INSTALLED_APPS = [
 
 # 4. MIDDLEWARE (El orden es vital)
 MIDDLEWARE = [
+    'debug_toolbar.middleware.DebugToolbarMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',  # Manejo de archivos estáticos
     'django.contrib.sessions.middleware.SessionMiddleware',

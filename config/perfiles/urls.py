@@ -4,28 +4,28 @@ from . import views
 app_name = 'perfiles'
 
 urlpatterns = [
-    path('', views.listar_perfiles, name='listar_perfiles'),
-    path('ciudades/', views.listar_ciudades, name='listar_ciudades'),
-    path('servicios-catalogo/', views.listar_servicios_catalogo, name='listar_servicios_catalogo'),
-    path('tags/', views.listar_tags, name='listar_tags'),
-    path('likes/', views.listar_mis_likes, name='listar_mis_likes'),
-    path('<int:id>/like/', views.dar_like, name='dar_like'),
-    path('<int:id>/unlike/', views.quitar_like, name='quitar_like'),
-    path('mi-perfil/', views.mi_perfil, name='mi_perfil'),
-    path('<int:id>/', views.ver_perfil, name='ver_perfil'),
-    path('create/', views.crear_perfil, name='crear_perfil'),
-    path('mi-perfil/actualizar/', views.actualizar_perfil, name='actualizar_perfil'),
-    path('mi-perfil/actualizar-tags/', views.actualizar_tags, name='actualizar_tags'),
-    path('solicitar-cambio-ciudad/', views.solicitar_cambio_ciudad, name='solicitar_cambio_ciudad'),
+    # --- 1. CATÁLOGOS PÚBLICOS ---
+    path('ciudades/', views.CiudadListView.as_view(), name='listar_ciudades'),
+    path('servicios/', views.ServicioListView.as_view(), name='listar_servicios'),
+    path('tags/', views.TagListView.as_view(), name='listar_tags'),
+    path('servicios-catalogo/', views.ServicioCatalogoView.as_view(), name='servicios-catalogo'),
+
+    # --- 2. GESTIÓN PRIVADA (¡ESTO DEBE IR PRIMERO!) ---
+    # Al poner esto arriba, Django revisa si es "mi-perfil" ANTES de pensar que es un slug
+    path('mi-perfil/', views.MiPerfilView.as_view(), name='mi_perfil'),
+    path('mi-galeria/', views.MiGaleriaView.as_view(), name='mi_galeria'),
+    path('mi-galeria/<int:pk>/', views.GaleriaDetailView.as_view(), name='eliminar_foto'),
+    path('solicitar-cambio-ciudad/', views.SolicitudCambioCiudadCreateView.as_view(), name='solicitar_cambio_ciudad'),
     
-    # Servicios CRUD
-    path('mis-servicios/', views.listar_mis_servicios, name='listar_mis_servicios'),
-    path('mis-servicios/crear/', views.crear_servicio, name='crear_servicio'),
-    path('mis-servicios/<int:servicio_id>/actualizar/', views.actualizar_servicio, name='actualizar_servicio'),
-    path('mis-servicios/<int:servicio_id>/eliminar/', views.eliminar_servicio, name='eliminar_servicio'),
+
+    # --- 3. PERFILES PÚBLICOS ---
+    path('', views.PerfilModeloListView.as_view(), name='listar_perfiles'),
     
-    # Galería CRUD
-    path('mi-galeria/', views.listar_mis_fotos, name='listar_mis_fotos'),
-    path('mi-galeria/subir/', views.subir_foto, name='subir_foto'),
-    path('mi-galeria/<int:foto_id>/eliminar/', views.eliminar_foto, name='eliminar_foto'),
+    # INTERACCIONES
+    path('<int:perfil_id>/like/', views.ToggleLikeView.as_view(), name='toggle_like'),
+    path('likes/', views.MisLikesView.as_view(), name='listar_mis_likes'),
+
+    # --- 4. DETALLE POR SLUG (¡ESTO DEBE IR AL FINAL!) ---
+    # Esta ruta atrapa "cualquier cosa". Si la pones arriba, se come a las demás.
+    path('<slug:slug>/', views.PerfilModeloDetailView.as_view(), name='ver_perfil'),
 ]

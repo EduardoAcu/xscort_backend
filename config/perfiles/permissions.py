@@ -1,46 +1,37 @@
 from rest_framework import permissions
 
-
 class IsOwnerOrReadOnly(permissions.BasePermission):
     """
-    Custom permission to only allow owners of an object to edit it.
-    Assumes the model instance has a `user` attribute.
+    Permite lectura a cualquiera (GET), pero escritura (PUT, PATCH, DELETE)
+    solo al dueño del objeto.
     """
-
     def has_object_permission(self, request, view, obj):
-        # Read permissions are allowed to any request,
-        # so we'll always allow GET, HEAD or OPTIONS requests.
         if request.method in permissions.SAFE_METHODS:
             return True
-
-        # Write permissions are only allowed to the owner of the object.
         return obj.user == request.user
 
 
-class IsProfileOwner(permissions.BasePermission):
+class IsModelUser(permissions.BasePermission):
     """
-    Custom permission to only allow the owner of a profile to access/edit it.
-    Specifically designed for PerfilModelo where user is accessed via obj.user
+    Verifica si el usuario autenticado tiene el flag 'es_modelo=True'.
+    Nota: He cambiado el nombre de 'IsModeloUser' a 'IsModelUser' para 
+    coincidir con el import de views.py.
     """
-
-    def has_permission(self, request, view):
-        # User must be authenticated
-        return request.user and request.user.is_authenticated
-
-    def has_object_permission(self, request, view, obj):
-        # Check if the user owns this profile
-        return obj.user == request.user
-
-
-class IsModeloUser(permissions.BasePermission):
-    """
-    Permission to check if the authenticated user is a modelo (es_modelo=True)
-    """
-
     def has_permission(self, request, view):
         return (
             request.user
             and request.user.is_authenticated
-            and hasattr(request.user, 'es_modelo')
-            and request.user.es_modelo
+            and getattr(request.user, 'es_modelo', False)
         )
+
+class IsProfileOwner(permissions.BasePermission):
+    """
+    Asegura que el usuario sea el dueño del perfil específico.
+    Útil si alguna vez necesitas editar un perfil por ID, aunque
+    en MiPerfilView esto se maneja automáticamente en el get_queryset.
+    """
+    def has_permission(self, request, view):
+        return request.user and request.user.is_authenticated
+
+    def has_object_permission(self, request, view, obj):
+        return obj.user == request.user
