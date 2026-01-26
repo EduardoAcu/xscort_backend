@@ -1,48 +1,39 @@
 from rest_framework import serializers
 from django.conf import settings
-from .models import PerfilModelo, Servicio, GaleriaFoto, Tag, SolicitudCambioCiudad, Ciudad, ServicioCatalogo
+from .models import PerfilModelo, Servicio, GaleriaFoto, Tag, SolicitudCambioCiudad, Ciudad, Servicio
 from reviews.models import Resena
 
+# --- Serializers de Catálogos (Simples) ---
 
 class TagSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tag
-        fields = ['id', 'nombre', 'categoria']
+        fields = ['id', 'nombre', 'slug', 'categoria']
 
-
+# CORRECCIÓN AQUÍ: Agregamos 'slug'
 class ServicioCatalogoSerializer(serializers.ModelSerializer):
     class Meta:
-        model = ServicioCatalogo
-        fields = ['id', 'nombre', 'activo', 'permite_custom']
-
+        model = Servicio
+        # Antes: fields = ['id', 'nombre']
+        fields = ['id', 'nombre', 'slug'] 
 
 class ServicioSerializer(serializers.ModelSerializer):
-    catalogo = ServicioCatalogoSerializer(read_only=True)
-    catalogo_id = serializers.PrimaryKeyRelatedField(
-        source='catalogo',
-        queryset=ServicioCatalogo.objects.filter(activo=True),
-        write_only=True,
-        required=False,
-    )
-
     class Meta:
         model = Servicio
-        fields = ['id', 'perfil_modelo', 'catalogo', 'catalogo_id', 'custom_text']
+        fields = ['id', 'nombre', 'slug', 'icono', 'activo']
 
-    def validate(self, attrs):
-        catalogo = attrs.get('catalogo')
-        custom_text = attrs.get('custom_text')
-        if not catalogo and not custom_text:
-            raise serializers.ValidationError("Debes elegir un servicio del catálogo o ingresar un texto personalizado.")
-        if catalogo and custom_text and not catalogo.permite_custom:
-            raise serializers.ValidationError("El servicio seleccionado no permite texto personalizado.")
-        return attrs
+class CiudadSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Ciudad
+        fields = ['id', 'nombre', 'slug', 'activa', 'ordering']
 
+
+# --- Serializers de Contenido ---
 
 class GaleriaFotoSerializer(serializers.ModelSerializer):
     class Meta:
         model = GaleriaFoto
-        fields = ['id', 'perfil_modelo', 'imagen']
+        fields = ['id', 'imagen', 'orden', 'es_publica']
 
 
 class ResenaAprobadaSerializer(serializers.ModelSerializer):
@@ -53,25 +44,18 @@ class ResenaAprobadaSerializer(serializers.ModelSerializer):
         fields = ['id', 'cliente_username', 'rating', 'comentario', 'fecha_creacion']
 
 
-class CiudadSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Ciudad
-        fields = ['id', 'nombre', 'ordering', 'activa']
-
+# --- Serializer PRINCIPAL de Perfil (Lectura Pública - GET) ---
 
 class PerfilModeloSerializer(serializers.ModelSerializer):
-    ciudad = serializers.CharField(source='ciudad.nombre', read_only=True)
-    ciudad_id = serializers.PrimaryKeyRelatedField(
-        source='ciudad',
-        queryset=Ciudad.objects.filter(activa=True),
-        write_only=True,
-        required=True
-    )
+    # Relaciones expandidas para lectura fácil (Objetos completos)
+    ciudad = CiudadSerializer(read_only=True)
     tags = TagSerializer(many=True, read_only=True)
     servicios = ServicioSerializer(many=True, read_only=True)
-    galeria_fotos = GaleriaFotoSerializer(many=True, read_only=True)
+    
+    galeria_fotos = serializers.SerializerMethodField()
+    
+    # Campos calculados
     resenas = serializers.SerializerMethodField()
-    disclaimer = serializers.SerializerMethodField()
     likes_count = serializers.IntegerField(source='likes.count', read_only=True)
     liked_by_me = serializers.SerializerMethodField()
     
@@ -79,50 +63,112 @@ class PerfilModeloSerializer(serializers.ModelSerializer):
         model = PerfilModelo
         fields = [
             'id',
+            'slug',
+            'user',
             'foto_perfil',
+            'foto_portada',
             'nombre_artistico',
             'biografia',
             'telefono_contacto',
+            'whatsapp',
             'telegram_contacto',
             'ciudad',
-            'ciudad_id',
             'edad',
             'genero',
             'peso',
             'altura',
-            'medidas',
-            'nacionalidad',
+            'medidas',      
+            'nacionalidad',  
             'tags',
             'servicios',
             'galeria_fotos',
             'resenas',
-            'disclaimer',
             'likes_count',
             'liked_by_me',
+            'esta_publico',
         ]
-        extra_kwargs = {
-            'ciudad_id': {'required': True},
-        }
+        read_only_fields = ['slug', 'user', 'likes_count', 'liked_by_me']
     
-    def get_resenas(self, obj):
-        resenas_aprobadas = obj.resenas.filter(aprobada=True)
-        return ResenaAprobadaSerializer(resenas_aprobadas, many=True).data
+    def get_galeria_fotos(self, obj):
+        fotos = obj.galeria_fotos.filter(es_publica=True).order_by('orden')
+        return GaleriaFotoSerializer(fotos, many=True).data
 
-    def get_disclaimer(self, obj):
-        return getattr(settings, "LEGAL_DISCLAIMER", "")
+    def get_resenas(self, obj):
+        if hasattr(obj, 'resenas'):
+            resenas_aprobadas = obj.resenas.filter(aprobada=True)
+            return ResenaAprobadaSerializer(resenas_aprobadas, many=True).data
+        return []
 
     def get_liked_by_me(self, obj):
         request = self.context.get('request')
-        if request and request.user.is_authenticated and not request.user.es_modelo:
+        if request and request.user.is_authenticated:
             return obj.likes.filter(user=request.user).exists()
         return False
 
 
+# --- Serializer de EDICIÓN (Para el Panel - PATCH/PUT) ---
+
+class PerfilModeloUpdateSerializer(serializers.ModelSerializer):
+    """
+    Se usa cuando la modelo edita su propio perfil.
+    Diferencia: 'servicios' y 'tags' aceptan LISTAS DE IDs.
+    """
+    
+    # ESTA ES LA MAGIA: Acepta [1, 2, 3] y guarda las relaciones
+    servicios = serializers.PrimaryKeyRelatedField(
+        many=True, 
+        queryset=Servicio.objects.filter(activo=True),
+        required=False
+    )
+    tags = serializers.PrimaryKeyRelatedField(
+        many=True, 
+        queryset=Tag.objects.all(),
+        required=False
+    )
+    
+    # La ciudad es read_only aquí porque se cambia vía solicitud
+    ciudad_nombre = serializers.CharField(source='ciudad.nombre', read_only=True)
+
+    class Meta:
+        model = PerfilModelo
+        fields = [
+            'foto_perfil',
+            'foto_portada',
+            'nombre_artistico',
+            'biografia',
+            'telefono_contacto',
+            'whatsapp',
+            'telegram_contacto',
+            'edad',
+            'genero',        
+            'altura',
+            'peso',
+            'medidas',       
+            'nacionalidad',  
+            'ciudad_nombre',
+            'servicios',     
+            'tags',          
+            'esta_publico',
+        ]
+
+    def to_representation(self, instance):
+        """
+        Cuando respondes al Frontend después de guardar, 
+        devuelves IDs en lugar de objetos para facilitar la UI.
+        """
+        rep = super().to_representation(instance)
+        rep['servicios'] = [s.id for s in instance.servicios.all()]
+        rep['tags'] = [t.id for t in instance.tags.all()]
+        return rep
+
+
+# --- Serializer de Cambio de Ciudad ---
+
 class SolicitudCambioCiudadSerializer(serializers.ModelSerializer):
-    perfil_nombre = serializers.CharField(source='perfil.nombre_artistico', read_only=True)
-    ciudad_nueva = serializers.CharField(source='ciudad_nueva.nombre', read_only=True)
-    ciudad_nueva_id = serializers.PrimaryKeyRelatedField(
-        source='ciudad_nueva',
+    ciudad_nueva_nombre = serializers.CharField(source='ciudad_nueva.nombre', read_only=True)
+    
+    # IMPORTANTE: El frontend debe enviar 'ciudad_nueva' (el ID)
+    ciudad_nueva = serializers.PrimaryKeyRelatedField(
         queryset=Ciudad.objects.filter(activa=True),
         write_only=True,
         required=True,
@@ -130,28 +176,5 @@ class SolicitudCambioCiudadSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = SolicitudCambioCiudad
-        fields = ['id', 'perfil', 'perfil_nombre', 'ciudad_nueva', 'ciudad_nueva_id', 'estado', 'fecha_solicitud']
-        read_only_fields = ['estado', 'fecha_solicitud']
-
-
-class PerfilModeloUpdateSerializer(serializers.ModelSerializer):
-    """
-    Serializer for updating PerfilModelo. 
-    Excludes ciudad field - city changes must go through SolicitudCambioCiudad.
-    """
-    class Meta:
-        model = PerfilModelo
-        fields = [
-            'foto_perfil',
-            'nombre_artistico',
-            'biografia',
-            'telefono_contacto',
-            'telegram_contacto',
-            'edad',
-            'genero',
-            'peso',
-            'altura',
-            'medidas',
-            'nacionalidad',
-        ]
-        # Ciudad is intentionally excluded - it can only be changed via SolicitudCambioCiudad
+        fields = ['id', 'estado', 'fecha_solicitud', 'ciudad_nueva', 'ciudad_nueva_nombre', 'nota_admin']
+        read_only_fields = ['estado', 'fecha_solicitud', 'nota_admin']
