@@ -27,5 +27,5 @@ urlpatterns = [
 
     # --- 4. DETALLE POR SLUG (¡ESTO DEBE IR AL FINAL!) ---
     # Esta ruta atrapa "cualquier cosa". Si la pones arriba, se come a las demás.
-    path('<slug:slug>/', views.PerfilModeloDetailView.as_view(), name='ver_perfil'),
+    path('public/<slug:slug>/', views.PerfilModeloDetailView.as_view(), name='ver_perfil'),
 ]
